@@ -25,6 +25,15 @@
    the CPU.  See [IA32-v3a] sections 5.10 "Interrupt Descriptor
    Table (IDT)", 5.11 "IDT Descriptors", 5.12.1.2 "Flag Usage By
    Exception- or Interrupt-Handler Procedure". */
+/*
+Added the Code
+*/
+#define Debug_IntrGetLevel() asm volatile ("pushfl; popl %0" : "=g" (flags));
+#define Debug_IntrLevel() asm volatile ("sti");
+#define Debug_IntrDumpFrame() asm ("movl %%cr2, %0" : "=r" (cr2));
+
+
+
 static uint64_t idt[INTR_CNT];
 
 /* Interrupt handler functions for each interrupt. */
@@ -65,14 +74,15 @@ enum intr_level
 intr_get_level (void) 
 {
   uint32_t flags;
+  uint8_t  retintr = flags & FLAG_IF ? INTR_ON : INTR_OFF;
 
   /* Push the flags register on the processor stack, then pop the
      value off the stack into `flags'.  See [IA32-v2b] "PUSHF"
      and "POP" and [IA32-v3a] 5.8.1 "Masking Maskable Hardware
      Interrupts". */
-  asm volatile ("pushfl; popl %0" : "=g" (flags));
+  Debug_IntrGetLevel();
 
-  return flags & FLAG_IF ? INTR_ON : INTR_OFF;
+  return retintr;
 }
 
 /* Enables or disables interrupts as specified by LEVEL and
@@ -80,7 +90,8 @@ intr_get_level (void)
 enum intr_level
 intr_set_level (enum intr_level level) 
 {
-  return level == INTR_ON ? intr_enable () : intr_disable ();
+  uint8_t RetIntr = level == INTR_ON ? intr_enable () : intr_disable ();
+  return RetIntr;
 }
 
 /* Enables interrupts and returns the previous interrupt status. */
@@ -94,7 +105,7 @@ intr_enable (void)
 
      See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable
      Hardware Interrupts". */
-  asm volatile ("sti");
+   Debug_IntrLevel();
 
   return old_level;
 }
@@ -417,7 +428,7 @@ intr_dump_frame (const struct intr_frame *f)
      See [IA32-v2a] "MOV--Move to/from Control Registers" and
      [IA32-v3a] 5.14 "Interrupt 14--Page Fault Exception
      (#PF)". */
-  asm ("movl %%cr2, %0" : "=r" (cr2));
+  Debug_IntrDumpFrame();
 
   printf ("Interrupt %#04x (%s) at eip=%p\n",
           f->vec_no, intr_names[f->vec_no], f->eip);
