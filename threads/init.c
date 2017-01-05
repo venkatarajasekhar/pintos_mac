@@ -54,6 +54,11 @@ static const char *swap_bdev_name;
 #endif
 #endif /* FILESYS */
 
+/*Added the Code, used for different hardware Processors */
+
+#define Debug_PagingInit() asm volatile ("movl %0, %%cr3" : : "r" (vtop (init_page_dir)));
+
+
 /* -ul: Maximum number of pages to put into palloc's user pool. */
 static size_t user_page_limit = SIZE_MAX;
 
@@ -157,12 +162,13 @@ bss_init (void)
 static void
 paging_init (void)
 {
-  uint32_t *pd, *pt;
+  uint32_t *pd = NULL, *pt = NULL;
   size_t page;
   extern char _start, _end_kernel_text;
 
-  pd = init_page_dir = palloc_get_page (PAL_ASSERT | PAL_ZERO);
-  pt = NULL;
+   init_page_dir = palloc_get_page (PAL_ASSERT | PAL_ZERO);
+   pd = init_page_dir;
+   pt = NULL;
   for (page = 0; page < init_ram_pages; page++)
     {
       uintptr_t paddr = page * PGSIZE;
@@ -185,7 +191,7 @@ paging_init (void)
      new page tables immediately.  See [IA32-v2a] "MOV--Move
      to/from Control Registers" and [IA32-v3a] 3.7.5 "Base Address
      of the Page Directory". */
-  asm volatile ("movl %0, %%cr3" : : "r" (vtop (init_page_dir)));
+     Debug_PagingInit();
 }
 
 /* Breaks the kernel command line into words and returns them as
@@ -194,7 +200,7 @@ static char **
 read_command_line (void) 
 {
   static char *argv[LOADER_ARGS_LEN / 2 + 1];
-  char *p, *end;
+  char *p = NULL, *end = NULL;
   int argc;
   int i;
 
@@ -230,7 +236,7 @@ parse_options (char **argv)
 {
   for (; *argv != NULL && **argv == '-'; argv++)
     {
-      char *save_ptr;
+      char *save_ptr = NULL;
       char *name = strtok_r (*argv, "=", &save_ptr);
       char *value = strtok_r (NULL, "", &save_ptr);
       
@@ -298,12 +304,12 @@ static void
 run_actions (char **argv) 
 {
   /* An action. */
-  struct action 
+  typedef struct action 
     {
       char *name;                       /* Action name. */
       int argc;                         /* # of args, including action name. */
       void (*function) (char **argv);   /* Function to execute action. */
-    };
+    }stAction_t;
 
   /* Table of supported actions. */
   static const struct action actions[] = 
@@ -321,11 +327,11 @@ run_actions (char **argv)
 
   while (*argv != NULL)
     {
-      const struct action *a;
+      const stAction_t *a =(stAction_t *)malloc(sizeof(stAction_t *)) ;
       int i;
 
       /* Find action name. */
-      for (a = actions; ; a++)
+      for (; ; a++)
         if (a->name == NULL)
           PANIC ("unknown action `%s' (use -h for help)", *argv);
         else if (!strcmp (*argv, a->name))
